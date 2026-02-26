@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firestore Admin Panel</title>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 30px;
+        }
+
+        select, input, textarea, button {
+            padding: 8px;
+            margin: 6px 0;
+            width: 100%;
+        }
+
+        table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    margin-top: 20px;
+    border: 1px solid #ddd;          /* OUTER BORDER */
+}
+
+th, td {
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #eee;
+    text-align: center;      /* ✅ THIS LINE CENTERS EVERYTHING */
+    vertical-align: middle;  /* ✅ keeps content vertically centered */
+}
+
+th {
+    background: #4CAF50;
+    color: white;
+    border: 1px solid #4CAF50;       /* HEADER BORDER */
+}
+
+tr:hover {
+    background: #f9f9f9;
+}
+        button {
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            background: #2196F3;
+            color: white;
+        }
+
+        .deleteBtn {
+            background: #f44336;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Firestore Admin Dashboard</h2>
+
+<label>Select Collection</label>
+<select id="collectionSelect">
+    <option value="facts">facts</option>
+    <option value="challenges">challenges</option>
+    <option value="awareness_content">awareness_content</option>
+    <option value="recycling_tips">recycling_tips</option>
+    <option value="quiz_questions">quiz_questions</option>
+    <option value="reports">reports</option>
+</select>
+
+<div class="container">
+    <h3>Add / Edit Document</h3>
+    <div id="dynamicForm"></div>
+    <button id="saveBtn">Save Document</button>
+</div>
+
+<table>
+    <thead>
+        <tr id="tableHead"></tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+</table>
+
+<script>
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDkTK0FRCNbQCHtBOpG1ilXU1fiFWKfan0",
+        authDomain: "csp-waste-awareness.firebaseapp.com",
+        projectId: "csp-waste-awareness",
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const collectionSelect = document.getElementById("collectionSelect");
+    const formContainer = document.getElementById("dynamicForm");
+    const tableHead = document.getElementById("tableHead");
+    const tableBody = document.getElementById("tableBody");
+    const saveBtn = document.getElementById("saveBtn");
+
+    let editingId = null;
+
+    const schemas = {
+        facts: ["text", "imageUrl"],
+        challenges: ["title", "description", "imageUrl", "durationDays"],
+        awareness_content: ["title", "description", "imageUrl", "videoId"],
+        recycling_tips: ["title", "description", "imageUrl"],
+        quiz_questions: ["question", "option1", "option2", "option3", "option4", "correctAnswer"],
+        reports: ["name","phone", "timestamp","issueType", "description", "location", "status"]
+    };
+
+    function buildForm(collection) {
+        formContainer.innerHTML = "";
+
+        schemas[collection].forEach(field => {
+            formContainer.innerHTML += `<input id="${field}" placeholder="${field}" />`;
+        });
+    }
+
+    function buildTable(collection, docs) {
+
+        tableHead.innerHTML = "";
+        tableBody.innerHTML = "";
+
+        schemas[collection].forEach(field => {
+            tableHead.innerHTML += `<th>${field}</th>`;
+        });
+
+        tableHead.innerHTML += "<th>Actions</th>";
+
+        docs.forEach(doc => {
+
+            const data = doc.data();
+            const id = doc.id;
+
+            let row = "<tr>";
+
+            schemas[collection].forEach(field => {
+                row += `<td>${data[field] ?? ""}</td>`;
+            });
+
+            row += `
+                <td>
+                    <button onclick="editDoc('${collection}', '${id}')">Edit</button>
+                    <button class="deleteBtn" onclick="deleteDoc('${collection}', '${id}')">Delete</button>
+                </td>
+            `;
+
+            row += "</tr>";
+
+            tableBody.innerHTML += row;
+        });
+    }
+
+    function loadCollection() {
+
+        const collection = collectionSelect.value;
+
+        db.collection(collection).onSnapshot(snapshot => {
+            buildTable(collection, snapshot.docs);
+        });
+
+        buildForm(collection);
+    }
+
+    saveBtn.onclick = () => {
+
+        const collection = collectionSelect.value;
+        const data = {};
+
+        schemas[collection].forEach(field => {
+            data[field] = document.getElementById(field).value;
+        });
+
+        if (editingId) {
+            db.collection(collection).doc(editingId).update(data);
+            editingId = null;
+        } else {
+            db.collection(collection).add(data);
+        }
+
+        buildForm(collection);
+    };
+
+    window.editDoc = (collection, id) => {
+
+        editingId = id;
+
+        db.collection(collection).doc(id).get().then(doc => {
+
+            const data = doc.data();
+
+            schemas[collection].forEach(field => {
+                document.getElementById(field).value = data[field] ?? "";
+            });
+        });
+    };
+
+    window.deleteDoc = (collection, id) => {
+        db.collection(collection).doc(id).delete();
+    };
+
+    collectionSelect.onchange = loadCollection;
+
+    loadCollection();
+
+</script>
+
+</body>
+</html>
